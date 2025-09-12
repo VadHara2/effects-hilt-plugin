@@ -1,7 +1,6 @@
 # One-off events (a.k.a. Effects) and even more :fire:
 
-[![Maven Central v1.x](https://img.shields.io/maven-central/v/com.elveum/effects-core.svg?label=Maven%20Central%20v1.x)](https://uandcode.com/sh/effects)
-[![Maven Central v2.x](https://img.shields.io/maven-central/v/com.uandcode/effects2-hilt-compose.svg?label=Maven%20Central%20v2.x)](https://uandcode.com/sh/effects2)
+[![Maven Central](https://img.shields.io/maven-central/v/com.uandcode/effects2-hilt-compose.svg?label=Maven%20Central)](https://uandcode.com/sh/effects2)
 ![API](https://img.shields.io/badge/API-23%2B-brightgreen.svg?style=flat)
 ![JDK](https://img.shields.io/badge/JDK-17-brightgreen.svg?style=flat)
 ![Android Studio](https://img.shields.io/badge/Android%20Studio-Meerkat-brightgreen.svg?style=flat)
