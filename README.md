@@ -12,10 +12,6 @@ The most common use case is sending one-off events from Android ViewModels to th
 With this library, there's no need for `SharedFlow`, `Channel`, or extra event-related 
 properties in your state classes.
 
-⚠️ This page covers the 2.x release. Looking for the 1.x version? Click [here](/docs/README_LEGACY_1x.md) to learn more.
-
-ℹ️ Migration guide from v1.x to v2.x is [here](#migration-from-version-1x-to-2x).
-
 Supported DI Frameworks:
 - Hilt
 - Koin
