@@ -19,8 +19,9 @@ Supported DI Frameworks:
 
 ## Table of Contents
 
-- [Basic example (One-off event with Hilt)](#basic-example-one-off-event-with-hilt)
-- [Example projects](#example-projects)
+- [Basic Example (one-off event with Hilt)](#basic-example-one-off-event-with-hilt)
+- [More Complex Example (suspend functions and Flow)](#more-complex-example)
+- [Example Projects](#example-projects)
 - [Prerequisites](#prerequisites)
 - [Installation (Single-module Projects)](#installation-single-module-projects) 
   - [Hilt Integration](#hilt-integration)
@@ -61,7 +62,7 @@ Let's say you want to:
    @HiltViewModel
    class CatsViewModel @Inject constructor(
        // inject your interface here:
-       val toasts: Toasts,
+       private val toasts: Toasts,
    ): ViewModel() {
 
        fun removeCat(cat: Cat) {
@@ -92,7 +93,7 @@ Let's say you want to:
    }
    ```
 
-4. Use the implementation either in @Composable functions or in Activity/Fragment classes :
+4. Use the implementation either in @Composable functions or in Activity/Fragment classes:
 
    - for projects with Jetpack Compose:
 
@@ -141,6 +142,168 @@ Let's say you want to:
          }
      }
      ```
+
+## More Complex Example
+
+1. Define an interface that contains `suspend` functions and methods returning a `Flow`:
+
+   ```kotlin
+   interface Effects {
+   
+       // suspend functions can return results of effect processing:
+       suspend fun showConfirmDialog(message: String): Boolean
+
+       // non-suspend functions can return a Flow:
+       fun listenActions(): Flow<Action>
+   
+   }
+   ```
+
+2. Inject the interface into a ViewModel constructor:
+
+   ```kotlin
+   @HiltViewModel
+   class MyViewModel @Inject constructor(
+       private val effects: Effects
+   ) : ViewModel() {
+
+       init {
+           // example of using a Flow:
+           effects.listenActions()
+               .onEach { action ->
+                    when (action) {
+                        is SignIn -> signIn(action.email, action.password)
+                        else -> TODO("other actions if needed")
+                    }
+               }
+               .launchIn(viewModelScope)
+       }
+
+       fun deleteEverything() {
+           // example of using a suspend function:
+           viewModelScope.launch {
+               val confirmed = effects.showConfirmDialog("Remove system dir?")
+               if (confirmed) {
+                   TODO("let's play a game")
+               }
+           }
+       }
+   
+   }
+   ```
+
+3. Create an implementation of the `Effects` interface:
+
+   ```kotlin
+   @HiltEffect // <-- add this annotation
+   class EffectsImpl(private val context: Context) : Effects {
+
+       private val eventsFlow = MutableSharedFlow<Action>(
+           extraBufferCapacity = 8,
+           onBufferOverflow = BufferOverflow.DROP_OLDEST,
+       )
+
+       override suspend fun showConfirmDialog(message: String): Boolean {
+           // the suspend function is cancelled on stop and restarted after device rotation
+           return suspendCancellableCoroutine { continuation ->
+               val dialog = TODO() // build an alert dialog using context and message
+               // use continuation.resume(true/false) to return the result to the ViewModel
+               dialog.show()
+               continuation.invokeOnCancellation {
+                   dialog.dismiss()
+               }
+           }
+       }
+
+       // collecting the Flow is cancelled on stop and restarted after device rotation
+       override fun listenActions(): Flow<Action> = eventsFlow
+
+       fun onAction(action: Action) {
+           eventsFlow.tryEmit(action)
+       }
+   }
+   ```
+   
+4. Use the implementation in `@Composable` functions or in `Activity`/`Fragment` classes. Example for Jetpack Compose:
+
+   ```kotlin
+     @AndroidEntryPoint
+     class MainActivity : AppCompatActivity() {
+ 
+         override fun onCreate(savedInstanceState: Bundle?) {
+             super.onCreate()
+             setContent {
+                 val effects = remember { EffectsImpl(this) }
+                 EffectProvider(effects) {
+                     // now, EffectsImpl is connected globally for each screen within MyApp
+                     MyApp()
+                 }
+             }
+         }
+     }
+      
+     @Composable
+     fun MyApp() {
+         // use getEffect() if you need to interact with `EffectsImpl` in
+         // composable functions:
+         val effectsImpl = getEffect<EffectsImpl>()
+         Button(
+             onClick = {
+                 effectsImpl.onAction(Action.TestButtonClicked)
+             }
+         ) {
+             Text("Click Me")
+         }
+     }
+     ```
+
+5. Real-world scenario #1: Define a `Router` interface and inject it into your ViewModel.
+   Its implementation can safely accept a NavController in its constructor without memory leaks.
+   Usage example in a ViewModel:
+
+   ```kotlin
+   @HiltViewModel
+   class MyViewModel @Inject constructor(
+       private val signInUseCase: SignInUseCase,
+       private val router: Router,
+       private val toaster: Toaster,
+   ) : ViewModel() {
+
+       fun signIn(credentials: Credentials) {
+           viewModelScope.launch {
+               try {
+                   signInUseCase.invoke()
+                   router.launchMainScreen()
+               } catch (_: SignInException) {
+                   toaster.toast("Oops, can't sign in :)")
+               }
+           }
+       }
+
+   }
+   ```
+
+6. Real-world scenario #2: Open dialogs, request permissions, etc., via your own interface,
+   and wait for results using suspend functions. A Context or Activity instance can be safely
+   used inside your PermissionRequester implementation. Usage example in a ViewModel:
+
+   ```kotlin
+   @HiltViewModel
+   class MyViewModel @Inject constructor(
+       private val startTrackingUseCase: StartTrackUseCase,
+       private val permissionRequester: PermissionRequester,
+   ) : ViewModel() {
+
+       fun letsDrive() {
+           viewModelScope.launch {
+               if (permissionRequester.requestAccessFineLocation() == PermissionResult.Granted) {
+                   startTrackingUseCase.invoke()
+               }
+           }
+       }
+
+   }
+   ```
 
 ## Example projects
 
@@ -255,7 +418,7 @@ Check out [the single-module No-DI example app](/app-examples/core/app-singlemod
   - `@KoinEffect` (Koin extension)
   - `@EffectClass`
 
-- Steps for Library Modules
+- Steps for Library Modules:
   - Ensure [KSP is added and configured](/docs/ksp-installation.md) in the library module.
   - Add the following KSP argument:
     
